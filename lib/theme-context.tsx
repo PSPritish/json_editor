@@ -28,24 +28,24 @@ export function useTheme() {
 
 const STORAGE_KEY = "riskjson-theme";
 
+function getInitialTheme(): Theme {
+  // Read the class that was already set by the inline script in layout.tsx
+  // This avoids any mismatch or flash.
+  if (typeof document !== "undefined") {
+    return document.documentElement.classList.contains("dark") ? "dark" : "light";
+  }
+  return "dark";
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("dark");
+  const [theme, setThemeState] = useState<Theme>(getInitialTheme);
   const [mounted, setMounted] = useState(false);
 
-  // Initialize theme from localStorage or system preference
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
-    if (stored === "light" || stored === "dark") {
-      setThemeState(stored);
-    } else if (window.matchMedia("(prefers-color-scheme: light)").matches) {
-      setThemeState("light");
-    } else {
-      setThemeState("dark");
-    }
     setMounted(true);
   }, []);
 
-  // Apply theme class to <html>
+  // Apply theme class to <html> whenever it changes
   useEffect(() => {
     if (!mounted) return;
     const root = document.documentElement;

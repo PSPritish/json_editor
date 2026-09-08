@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
@@ -10,6 +10,8 @@ import ValidationPanel from "@/components/ValidationPanel";
 import DiffPanel from "@/components/DiffPanel";
 import TimeMachine from "@/components/TimeMachine";
 import { useWorker } from "@/lib/use-worker";
+import { useTheme } from "@/lib/theme-context";
+import { useToast } from "@/lib/toast-context";
 import { type ParserApi } from "@/workers/json-parser.worker";
 import { type ValidatorApi, type ValidationError } from "@/workers/schema-validator.worker";
 import { type DiffApi, type DiffResult } from "@/workers/diff.worker";
@@ -19,10 +21,14 @@ import { matchShortcut } from "@/lib/keyboard-shortcuts";
 
 const Editor = dynamic(() => import("@/components/Editor"), { ssr: false });
 
+type AppView = "dual" | "home" | "main";
+
 export default function AppShell() {
-  // Navigation State
-  // view: "dual" (default), "home" (welcome screen), "main" (single file editor)
-  const [view, setView] = useState<"dual" | "home" | "main">("dual");
+  const { toggleTheme } = useTheme();
+  const { addToast } = useToast();
+
+  // --- Navigation ---
+  const [view, setView] = useState<AppView>("dual");
   const [activePanel, setActivePanel] = useState<string | null>(null);
   const [editorMode, setEditorMode] = useState<"text" | "tree">("text");
 
@@ -35,7 +41,7 @@ export default function AppShell() {
   const [isDirty, setIsDirty] = useState(false);
   const [parseTimeMs, setParseTimeMs] = useState(0);
   const [stats, setStats] = useState({ keys: 0, arrays: 0, maxDepth: 0, totalNodes: 0 });
-  
+
   // --- Dual Pane State ---
   const [leftContent, setLeftContent] = useState<string>("");
   const [rightContent, setRightContent] = useState<string>("");
@@ -49,14 +55,35 @@ export default function AppShell() {
   const [diffSnapshotId, setDiffSnapshotId] = useState<number | null>(null);
   const [isComputingDiff, setIsComputingDiff] = useState(false);
 
-  // --- Workers ---
-  const { api: parserApi } = useWorker<ParserApi>(() => new Worker(new URL("../workers/json-parser.worker.ts", import.meta.url)));
-  const { api: validatorApi } = useWorker<ValidatorApi>(() => new Worker(new URL("../workers/schema-validator.worker.ts", import.meta.url)));
-  const { api: diffApi } = useWorker<DiffApi>(() => new Worker(new URL("../workers/diff.worker.ts", import.meta.url)));
+  // --- Debounce timer ref ---
+  const validationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // --- Workers ---
+  const { api: parserApi, error: parserError } = useWorker<ParserApi>(
+    () => new Worker(new URL("../workers/json-parser.worker.ts", import.meta.url))
+  );
+  const { api: validatorApi, error: validatorError } = useWorker<ValidatorApi>(
+    () => new Worker(new URL("../workers/schema-validator.worker.ts", import.meta.url))
+  );
+  const { api: diffApi, error: diffError } = useWorker<DiffApi>(
+    () => new Worker(new URL("../workers/diff.worker.ts", import.meta.url))
+  );
+
+  // Show worker initialization errors
+  useEffect(() => {
+    if (parserError) addToast(`Parser worker failed: ${parserError}`, "error");
+    if (validatorError) addToast(`Validator worker failed: ${validatorError}`, "error");
+    if (diffError) addToast(`Diff worker failed: ${diffError}`, "error");
+  }, [parserError, validatorError, diffError, addToast]);
+
+  // --- Helpers ---
   const loadSnapshots = useCallback(async (recordId: number) => {
-    const snaps = await getSnapshots(recordId);
-    setSnapshots(snaps);
+    try {
+      const snaps = await getSnapshots(recordId);
+      setSnapshots(snaps);
+    } catch (e) {
+      console.error("Failed to load snapshots:", e);
+    }
   }, []);
 
   // --- Main Editor Handlers ---
@@ -66,23 +93,26 @@ export default function AppShell() {
     setIsDirty(true);
 
     if (parserApi) {
-      parserApi.getStats(newContent).then(setStats);
+      parserApi.getStats(newContent).then(setStats).catch(() => {});
     }
 
     if (validatorApi && hasSchema) {
       setValidationStatus("checking");
-      const timer = setTimeout(() => {
+      if (validationTimerRef.current) clearTimeout(validationTimerRef.current);
+      validationTimerRef.current = setTimeout(() => {
         try {
           const parsed = JSON.parse(newContent);
-          validatorApi.validate(parsed).then((res) => {
-            setValidationErrors(res.errors);
-            setValidationStatus(res.valid ? "valid" : "invalid");
-          });
+          validatorApi
+            .validate(parsed)
+            .then((res) => {
+              setValidationErrors(res.errors);
+              setValidationStatus(res.valid ? "valid" : "invalid");
+            })
+            .catch(() => setValidationStatus("invalid"));
         } catch {
           setValidationStatus("invalid");
         }
       }, 500);
-      return () => clearTimeout(timer);
     }
   }, [parserApi, validatorApi, hasSchema]);
 
@@ -96,35 +126,54 @@ export default function AppShell() {
       setFileSizeBytes(result.sizeBytes);
       setIsDirty(false);
       setView("main");
+      setActivePanel(null);
 
-      const recordId = await saveFileRecord({
-        name: result.name,
-        handle: result.handle,
-        lastOpened: Date.now(),
-        sizeBytes: result.sizeBytes,
-      });
-      setFileRecordId(recordId);
-      await createSnapshot(recordId, result.content, "Opened");
-      loadSnapshots(recordId);
+      try {
+        const recordId = await saveFileRecord({
+          name: result.name,
+          handle: result.handle,
+          lastOpened: Date.now(),
+          sizeBytes: result.sizeBytes,
+        });
+        setFileRecordId(recordId);
+        await createSnapshot(recordId, result.content, "Opened");
+        loadSnapshots(recordId);
+      } catch (dbErr) {
+        console.error("IndexedDB error:", dbErr);
+        addToast("Could not save to recent files (IndexedDB error)", "error");
+      }
 
       if (parserApi) {
-        const parseRes = await parserApi.parse(result.content);
-        setParseTimeMs(parseRes.parseTimeMs);
-        if (parseRes.success) {
-          const s = await parserApi.getStats(result.content);
-          setStats(s);
+        try {
+          const parseRes = await parserApi.parse(result.content);
+          setParseTimeMs(parseRes.parseTimeMs);
+          if (parseRes.success) {
+            const s = await parserApi.getStats(result.content);
+            setStats(s);
+          }
+        } catch (workerErr) {
+          console.error("Parser worker error:", workerErr);
         }
       }
+
+      addToast(`Opened ${result.name}`, "success");
     } catch (e) {
-      console.error("Failed to open file", e);
+      console.error("Failed to open file:", e);
+      addToast(`Failed to open file: ${e instanceof Error ? e.message : "Unknown error"}`, "error");
     }
-  }, [parserApi, loadSnapshots]);
+  }, [parserApi, loadSnapshots, addToast]);
 
   const handleOpenRecent = useCallback(async (record: FileRecord) => {
-    if (!record.handle) return;
+    if (!record.handle) {
+      addToast("Cannot reopen this file — file handle is missing", "error");
+      return;
+    }
     try {
       const hasPerm = await verifyPermission(record.handle);
-      if (!hasPerm) return;
+      if (!hasPerm) {
+        addToast("Permission denied — please reopen the file manually", "error");
+        return;
+      }
 
       const file = await record.handle.getFile();
       const content = await file.text();
@@ -135,79 +184,121 @@ export default function AppShell() {
       setFileSizeBytes(file.size);
       setIsDirty(false);
       setView("main");
-      
+      setActivePanel(null);
+
       if (record.id) {
         setFileRecordId(record.id);
         updateFileRecord(record.id, { lastOpened: Date.now(), sizeBytes: file.size });
         loadSnapshots(record.id);
       }
       if (parserApi) {
-        const s = await parserApi.getStats(content);
-        setStats(s);
+        parserApi.getStats(content).then(setStats).catch(() => {});
       }
-    } catch (e) {
-      console.error("Failed to open recent file", e);
-    }
-  }, [parserApi, loadSnapshots]);
 
-  const handleSave = useCallback(async () => {
-    if (!fileHandle) return handleSaveAs();
-    const success = await saveJsonFile(fileHandle, fileContent);
-    if (success) {
-      setIsDirty(false);
-      if (fileRecordId) {
-        await updateFileRecord(fileRecordId, { lastOpened: Date.now(), sizeBytes: fileSizeBytes });
-        await createSnapshot(fileRecordId, fileContent, "Manual save");
-        loadSnapshots(fileRecordId);
-      }
+      addToast(`Opened ${file.name}`, "success");
+    } catch (e) {
+      console.error("Failed to open recent file:", e);
+      addToast(`Failed to open file: ${e instanceof Error ? e.message : "Unknown error"}`, "error");
     }
-  }, [fileHandle, fileContent, fileRecordId, fileSizeBytes, loadSnapshots]);
+  }, [parserApi, loadSnapshots, addToast]);
 
   const handleSaveAs = useCallback(async () => {
-    const handle = await saveAsJsonFile(fileContent, fileName || "document.json");
-    if (handle) {
-      setFileHandle(handle);
-      setFileName(handle.name);
-      setIsDirty(false);
-      const recordId = await saveFileRecord({
-        name: handle.name,
-        handle,
-        lastOpened: Date.now(),
-        sizeBytes: fileSizeBytes,
-      });
-      setFileRecordId(recordId);
-      await createSnapshot(recordId, fileContent, "Save As");
-      loadSnapshots(recordId);
+    try {
+      const handle = await saveAsJsonFile(fileContent, fileName || "document.json");
+      if (handle) {
+        setFileHandle(handle);
+        setFileName(handle.name);
+        setIsDirty(false);
+        try {
+          const recordId = await saveFileRecord({
+            name: handle.name,
+            handle,
+            lastOpened: Date.now(),
+            sizeBytes: fileSizeBytes,
+          });
+          setFileRecordId(recordId);
+          await createSnapshot(recordId, fileContent, "Save As");
+          loadSnapshots(recordId);
+        } catch (dbErr) {
+          console.error("IndexedDB error:", dbErr);
+        }
+        addToast(`Saved as ${handle.name}`, "success");
+      }
+    } catch (e) {
+      console.error("Save As failed:", e);
+      addToast(`Save As failed: ${e instanceof Error ? e.message : "Unknown error"}`, "error");
     }
-  }, [fileContent, fileName, fileSizeBytes, loadSnapshots]);
+  }, [fileContent, fileName, fileSizeBytes, loadSnapshots, addToast]);
+
+  const handleSave = useCallback(async () => {
+    if (!fileHandle) {
+      return handleSaveAs();
+    }
+    try {
+      const success = await saveJsonFile(fileHandle, fileContent);
+      if (success) {
+        setIsDirty(false);
+        if (fileRecordId) {
+          await updateFileRecord(fileRecordId, { lastOpened: Date.now(), sizeBytes: fileSizeBytes });
+          await createSnapshot(fileRecordId, fileContent, "Manual save");
+          loadSnapshots(fileRecordId);
+        }
+        addToast("File saved", "success");
+      } else {
+        addToast("Save failed — could not write to file", "error");
+      }
+    } catch (e) {
+      console.error("Save failed:", e);
+      addToast(`Save failed: ${e instanceof Error ? e.message : "Unknown error"}`, "error");
+    }
+  }, [fileHandle, fileContent, fileRecordId, fileSizeBytes, loadSnapshots, addToast, handleSaveAs]);
 
   const handleLoadSchema = useCallback(async () => {
     try {
       const result = await openJsonFile();
       if (!result) return;
       if (validatorApi) {
-        const schema = JSON.parse(result.content);
+        let schema;
+        try {
+          schema = JSON.parse(result.content);
+        } catch {
+          addToast("Invalid JSON schema file", "error");
+          return;
+        }
         await validatorApi.setSchema(schema);
         setHasSchema(true);
+        addToast(`Schema loaded: ${result.name}`, "success");
+        // Trigger validation
         handleEditorChange(fileContent);
       }
     } catch (e) {
-      alert("Invalid schema file.");
+      console.error("Schema load error:", e);
+      addToast(`Failed to load schema: ${e instanceof Error ? e.message : "Unknown error"}`, "error");
     }
-  }, [validatorApi, fileContent, handleEditorChange]);
+  }, [validatorApi, fileContent, handleEditorChange, addToast]);
 
   const handleFormat = useCallback(async (contentToFormat: string, setter: (val: string) => void) => {
-    if (!parserApi) return;
+    if (!parserApi) {
+      addToast("Parser not ready yet — try again", "info");
+      return;
+    }
     try {
-      const parsed = JSON.parse(contentToFormat);
-      const res = await parserApi.stringify(parsed, 2);
+      JSON.parse(contentToFormat); // validate first
+    } catch {
+      addToast("Cannot format — JSON is invalid", "error");
+      return;
+    }
+    try {
+      const res = await parserApi.stringify(JSON.parse(contentToFormat), 2);
       if (res.success && res.text) {
         setter(res.text);
+        addToast("Formatted", "success");
       }
     } catch (e) {
-      console.error("Cannot format invalid JSON");
+      console.error("Format error:", e);
+      addToast("Format failed", "error");
     }
-  }, [parserApi]);
+  }, [parserApi, addToast]);
 
   const handleCompareSnapshot = useCallback(async (snapshotId: number | null) => {
     setDiffSnapshotId(snapshotId);
@@ -225,43 +316,89 @@ export default function AppShell() {
         const diff = await diffApi.computeDiff(leftObj, rightObj);
         setDiffResult(diff);
       }
+    } catch (e) {
+      console.error("Diff error:", e);
+      addToast("Diff computation failed", "error");
     } finally {
       setIsComputingDiff(false);
     }
-  }, [diffApi, snapshots, fileContent]);
+  }, [diffApi, snapshots, fileContent, addToast]);
 
   // --- Dual Pane Handlers ---
   const handleDualCompare = useCallback(async () => {
-    if (!diffApi) return;
+    if (!diffApi) {
+      addToast("Diff engine not ready yet", "info");
+      return;
+    }
     try {
       const leftObj = JSON.parse(leftContent || "{}");
       const rightObj = JSON.parse(rightContent || "{}");
       const result = await diffApi.computeDiff(leftObj, rightObj);
       setDiffResult(result);
       setActivePanel("diff");
-    } catch (e) {
-      alert("Invalid JSON in one of the panes. Please fix before comparing.");
+      addToast("Diff computed", "success");
+    } catch {
+      addToast("Invalid JSON in one or both panes — fix before comparing", "error");
     }
-  }, [diffApi, leftContent, rightContent]);
+  }, [diffApi, leftContent, rightContent, addToast]);
 
-  // Sidebar changes view
-  const handleSidebarPanelChange = (panel: string | null) => {
+  // --- Sidebar Navigation ---
+  const handleSidebarPanelChange = useCallback((panel: string | null) => {
     if (panel === "home") {
       setView("home");
       setActivePanel(null);
-    } else {
-      if (view === "home") {
-        setView("main"); // Go back to main if leaving home
+    } else if (panel === "editor") {
+      // "Editor" icon always goes back to dual pane if no file is open
+      if (fileName) {
+        setView("main");
+      } else {
+        setView("dual");
       }
-      setActivePanel(panel);
+      setActivePanel(null);
+    } else {
+      // Panel toggles (timeMachine, diff, validation, shortcuts)
+      if (view === "home") {
+        setView(fileName ? "main" : "dual");
+      }
+      setActivePanel((prev) => (prev === panel ? null : panel));
     }
-  };
+  }, [view, fileName]);
+
+  // --- Keyboard Shortcuts ---
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const action = matchShortcut(e);
+      if (!action) return;
+
+      e.preventDefault();
+      switch (action) {
+        case "open": handleOpen(); break;
+        case "save": handleSave(); break;
+        case "saveAs": handleSaveAs(); break;
+        case "format":
+          handleFormat(
+            view === "dual" ? leftContent : fileContent,
+            view === "dual" ? setLeftContent : setFileContent
+          );
+          break;
+        case "toggleMode": setEditorMode(m => m === "text" ? "tree" : "text"); break;
+        case "toggleDiff": setActivePanel(p => p === "diff" ? null : "diff"); break;
+        case "toggleTimeMachine": setActivePanel(p => p === "timeMachine" ? null : "timeMachine"); break;
+        case "toggleValidation": setActivePanel(p => p === "validation" ? null : "validation"); break;
+        case "toggleTheme": toggleTheme(); break;
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [handleOpen, handleSave, handleSaveAs, handleFormat, toggleTheme, view, leftContent, fileContent]);
+
+  // Determine sidebar highlight
+  const sidebarActivePanel = view === "home" ? "home" : (view === "dual" || view === "main") ? (activePanel || "editor") : activePanel;
 
   return (
     <div className="app-layout">
-      {/* Dynamic Header based on view */}
       <Header
-        fileName={view === "dual" ? "Compare Mode" : (fileName || "Untitled")}
+        fileName={view === "dual" ? "Compare Mode" : (fileName || null)}
         fileSize={view === "dual" ? 0 : fileSizeBytes}
         parseTimeMs={view === "dual" ? 0 : parseTimeMs}
         isDirty={view === "dual" ? false : isDirty}
@@ -271,11 +408,16 @@ export default function AppShell() {
         onOpen={handleOpen}
         onSave={view === "dual" ? () => {} : handleSave}
         onSaveAs={view === "dual" ? () => {} : handleSaveAs}
-        onFormat={() => handleFormat(view === "dual" ? leftContent : fileContent, view === "dual" ? setLeftContent : setFileContent)}
+        onFormat={() =>
+          handleFormat(
+            view === "dual" ? leftContent : fileContent,
+            view === "dual" ? setLeftContent : setFileContent
+          )
+        }
         onLoadSchema={view === "dual" ? () => {} : handleLoadSchema}
       />
 
-      <Sidebar activePanel={view === "home" ? "home" : activePanel} onPanelChange={handleSidebarPanelChange} />
+      <Sidebar activePanel={sidebarActivePanel} onPanelChange={handleSidebarPanelChange} />
 
       <main className="app-main">
         {view === "home" && (
@@ -284,9 +426,10 @@ export default function AppShell() {
 
         {view === "dual" && (
           <div style={{ display: "flex", width: "100%", height: "100%", overflow: "hidden" }}>
+            {/* Left Pane */}
             <div style={{ flex: 1, borderRight: "1px solid var(--border)", display: "flex", flexDirection: "column" }}>
-              <div style={{ padding: 8, background: "var(--bg-secondary)", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>LEFT PANE</span>
+              <div className="pane-toolbar">
+                <span className="pane-label">LEFT PANE</span>
                 <button className="btn btn-ghost btn-sm" onClick={() => handleFormat(leftContent, setLeftContent)}>Format</button>
               </div>
               <div style={{ flex: 1, overflow: "hidden" }}>
@@ -294,12 +437,19 @@ export default function AppShell() {
               </div>
             </div>
 
+            {/* Right Pane */}
             <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-              <div style={{ padding: 8, background: "var(--bg-secondary)", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>RIGHT PANE</span>
+              <div className="pane-toolbar">
+                <span className="pane-label">RIGHT PANE</span>
                 <div style={{ display: "flex", gap: 4 }}>
                   <button className="btn btn-ghost btn-sm" onClick={() => handleFormat(rightContent, setRightContent)}>Format</button>
-                  <button className="btn btn-primary btn-sm" onClick={handleDualCompare}>Compare with Left</button>
+                  <button className="btn btn-primary btn-sm" onClick={handleDualCompare}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="2" y="3" width="8" height="18" rx="1" />
+                      <rect x="14" y="3" width="8" height="18" rx="1" />
+                    </svg>
+                    Compare
+                  </button>
                 </div>
               </div>
               <div style={{ flex: 1, overflow: "hidden" }}>
@@ -307,6 +457,7 @@ export default function AppShell() {
               </div>
             </div>
 
+            {/* Diff side panel */}
             {activePanel === "diff" && (
               <DiffPanel
                 diffResult={diffResult}
@@ -326,7 +477,7 @@ export default function AppShell() {
               <TimeMachine
                 snapshots={snapshots}
                 onClose={() => setActivePanel(null)}
-                onRevert={(c) => { setFileContent(c); setIsDirty(true); }}
+                onRevert={(c) => { setFileContent(c); setIsDirty(true); addToast("Reverted to snapshot", "info"); }}
                 onCompare={(id) => { setDiffSnapshotId(id); setActivePanel("diff"); }}
               />
             )}
