@@ -5,13 +5,24 @@ import { useTheme } from "@/lib/theme-context";
 import { Mode, createJSONEditor } from "vanilla-jsoneditor";
 import type { Content } from "vanilla-jsoneditor";
 
+type EditorMode = "text" | "tree" | "table";
+
 interface EditorProps {
   content: string;
-  mode: "text" | "tree";
+  mode: EditorMode;
   onChange: (content: string) => void;
+  readOnly?: boolean;
 }
 
-const Editor = memo(function Editor({ content, mode, onChange }: EditorProps) {
+function toJseMode(mode: EditorMode): Mode {
+  switch (mode) {
+    case "tree": return Mode.tree;
+    case "table": return Mode.table;
+    default: return Mode.text;
+  }
+}
+
+const Editor = memo(function Editor({ content, mode, onChange, readOnly = false }: EditorProps) {
   const { theme } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<ReturnType<typeof createJSONEditor> | null>(null);
@@ -24,9 +35,11 @@ const Editor = memo(function Editor({ content, mode, onChange }: EditorProps) {
     editorRef.current = createJSONEditor({
       target: containerRef.current,
       props: {
-        mode: mode === "tree" ? Mode.tree : Mode.text,
+        mode: toJseMode(mode),
         content: { text: content },
+        readOnly,
         onChange: (updatedContent: Content, previousContent: Content, patchResult: unknown) => {
+          if (readOnly) return;
           // Prevent onChange feedback loop
           internalUpdateRef.current = true;
           if ("text" in updatedContent && typeof updatedContent.text === "string") {
@@ -51,10 +64,17 @@ const Editor = memo(function Editor({ content, mode, onChange }: EditorProps) {
   useEffect(() => {
     if (editorRef.current) {
       editorRef.current.updateProps({
-        mode: mode === "tree" ? Mode.tree : Mode.text,
+        mode: toJseMode(mode),
       });
     }
   }, [mode]);
+
+  // Update readOnly
+  useEffect(() => {
+    if (editorRef.current) {
+      editorRef.current.updateProps({ readOnly });
+    }
+  }, [readOnly]);
 
   // Update content externally (e.g., from time machine or open file)
   useEffect(() => {

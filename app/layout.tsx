@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "RiskJSON Editor — Local-First JSON Editor for Risk Analysts",
+  title: "RiskJSON Editor",
   description:
     "High-performance, local-first JSON editor tailored for Risk Analysts managing complex fraud and compliance configurations.",
 };

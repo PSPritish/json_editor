@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, type MouseEvent as ReactMouseEvent } from "react";
 import dynamic from "next/dynamic";
 import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
@@ -30,7 +30,20 @@ export default function AppShell() {
   // --- Navigation ---
   const [view, setView] = useState<AppView>("dual");
   const [activePanel, setActivePanel] = useState<string | null>(null);
-  const [editorMode, setEditorMode] = useState<"text" | "tree">("text");
+  const [editorMode, setEditorMode] = useState<"text" | "tree" | "table">("text");
+
+  // --- Per-pane modes ---
+  type PaneMode = "text" | "tree" | "table";
+  const [leftMode, setLeftMode] = useState<PaneMode>("text");
+  const [rightMode, setRightMode] = useState<PaneMode>("text");
+
+  // --- Fullscreen pane ---
+  const [fullscreenPane, setFullscreenPane] = useState<"left" | "right" | null>(null);
+
+  // --- Resizer state ---
+  const [splitPercent, setSplitPercent] = useState(50);
+  const isResizingRef = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // --- Main Editor (Single File) State ---
   const [fileHandle, setFileHandle] = useState<FileSystemFileHandle | null>(null);
@@ -364,12 +377,42 @@ export default function AppShell() {
     }
   }, [view, fileName]);
 
+  // --- Resizer drag logic ---
+  const handleResizerMouseDown = useCallback((e: ReactMouseEvent) => {
+    e.preventDefault();
+    isResizingRef.current = true;
+    const target = e.currentTarget as HTMLElement;
+    target.classList.add("dragging");
+
+    const onMouseMove = (ev: globalThis.MouseEvent) => {
+      if (!isResizingRef.current || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const pct = ((ev.clientX - rect.left) / rect.width) * 100;
+      setSplitPercent(Math.max(15, Math.min(85, pct)));
+    };
+
+    const onMouseUp = () => {
+      isResizingRef.current = false;
+      target.classList.remove("dragging");
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }, []);
+
   // --- Keyboard Shortcuts ---
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Escape exits fullscreen pane
+      if (e.key === "Escape" && fullscreenPane) {
+        setFullscreenPane(null);
+        return;
+      }
+
       const action = matchShortcut(e);
       if (!action) return;
-
       e.preventDefault();
       switch (action) {
         case "open": handleOpen(); break;
@@ -381,11 +424,8 @@ export default function AppShell() {
             view === "dual" ? setLeftContent : setFileContent
           );
           break;
-        case "toggleMode": setEditorMode(m => m === "text" ? "tree" : "text"); break;
-        case "toggleDiff": setActivePanel(p => p === "diff" ? null : "diff"); break;
-        case "toggleTimeMachine": setActivePanel(p => p === "timeMachine" ? null : "timeMachine"); break;
-        case "toggleValidation": setActivePanel(p => p === "validation" ? null : "validation"); break;
         case "toggleTheme": toggleTheme(); break;
+        default: break;
       }
     };
     window.addEventListener("keydown", handler);
@@ -394,6 +434,71 @@ export default function AppShell() {
 
   // Determine sidebar highlight
   const sidebarActivePanel = view === "home" ? "home" : (view === "dual" || view === "main") ? (activePanel || "editor") : activePanel;
+
+  // --- Pane toolbar renderer ---
+  const renderPaneToolbar = (side: "left" | "right", paneMode: PaneMode, setPaneMode: (m: PaneMode) => void, content: string, setContent: (c: string) => void) => {
+    const isFs = fullscreenPane === side;
+    return (
+      <div className="pane-toolbar">
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span className="pane-label">{side === "left" ? "Document A" : "Document B"}</span>
+          <div className="mode-switch">
+            <button
+              className={paneMode === "text" ? "active" : ""}
+              onClick={() => setPaneMode("text")}
+              title="Code editor"
+            >
+              Code
+            </button>
+            <button
+              className={paneMode === "tree" ? "active" : ""}
+              onClick={() => setPaneMode("tree")}
+              title="Tree view — click values to edit, right-click for context menu"
+            >
+              Tree
+            </button>
+            <button
+              className={paneMode === "table" ? "active" : ""}
+              onClick={() => setPaneMode("table")}
+              title="Table view — for arrays of objects"
+            >
+              Table
+            </button>
+          </div>
+        </div>
+        <div className="pane-actions">
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => handleFormat(content, setContent)}
+            title="Format JSON"
+          >
+            Format
+          </button>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => setFullscreenPane(isFs ? null : side)}
+            title={isFs ? "Exit fullscreen (Esc)" : "Fullscreen this pane"}
+          >
+            {isFs ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="4 14 10 14 10 20" />
+                <polyline points="20 10 14 10 14 4" />
+                <line x1="14" y1="10" x2="21" y2="3" />
+                <line x1="3" y1="21" x2="10" y2="14" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="15 3 21 3 21 9" />
+                <polyline points="9 21 3 21 3 15" />
+                <line x1="21" y1="3" x2="14" y2="10" />
+                <line x1="3" y1="21" x2="10" y2="14" />
+              </svg>
+            )}
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="app-layout">
@@ -425,37 +530,71 @@ export default function AppShell() {
         )}
 
         {view === "dual" && (
-          <div style={{ display: "flex", width: "100%", height: "100%", overflow: "hidden" }}>
-            {/* Left Pane */}
-            <div style={{ flex: 1, borderRight: "1px solid var(--border)", display: "flex", flexDirection: "column" }}>
-              <div className="pane-toolbar">
-                <span className="pane-label">LEFT PANE</span>
-                <button className="btn btn-ghost btn-sm" onClick={() => handleFormat(leftContent, setLeftContent)}>Format</button>
-              </div>
-              <div style={{ flex: 1, overflow: "hidden" }}>
-                <Editor content={leftContent} mode={editorMode} onChange={setLeftContent} />
-              </div>
-            </div>
+          <div ref={containerRef} style={{ display: "flex", width: "100%", height: "100%", overflow: "hidden", position: "relative" }}>
 
-            {/* Right Pane */}
-            <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-              <div className="pane-toolbar">
-                <span className="pane-label">RIGHT PANE</span>
-                <div style={{ display: "flex", gap: 4 }}>
-                  <button className="btn btn-ghost btn-sm" onClick={() => handleFormat(rightContent, setRightContent)}>Format</button>
-                  <button className="btn btn-primary btn-sm" onClick={handleDualCompare}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <rect x="2" y="3" width="8" height="18" rx="1" />
-                      <rect x="14" y="3" width="8" height="18" rx="1" />
-                    </svg>
-                    Compare
-                  </button>
+            {/* Left Pane */}
+            {fullscreenPane !== "right" && (
+              <div
+                className={fullscreenPane === "left" ? "pane-fullscreen" : ""}
+                style={fullscreenPane === "left"
+                  ? undefined
+                  : { width: `${splitPercent}%`, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }
+                }
+              >
+                {renderPaneToolbar("left", leftMode, setLeftMode, leftContent, setLeftContent)}
+                <div style={{ flex: 1, overflow: "hidden" }}>
+                  <Editor content={leftContent} mode={leftMode} onChange={setLeftContent} />
                 </div>
               </div>
-              <div style={{ flex: 1, overflow: "hidden" }}>
-                <Editor content={rightContent} mode={editorMode} onChange={setRightContent} />
+            )}
+
+            {/* Drag-to-resize handle */}
+            {!fullscreenPane && (
+              <div
+                className="pane-resizer"
+                onMouseDown={handleResizerMouseDown}
+                title="Drag to resize panes"
+              />
+            )}
+
+            {/* Right Pane */}
+            {fullscreenPane !== "left" && (
+              <div
+                className={fullscreenPane === "right" ? "pane-fullscreen" : ""}
+                style={fullscreenPane === "right"
+                  ? undefined
+                  : { width: `${100 - splitPercent}%`, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }
+                }
+              >
+                {renderPaneToolbar("right", rightMode, setRightMode, rightContent, setRightContent)}
+                <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
+                  <Editor content={rightContent} mode={rightMode} onChange={setRightContent} />
+                  {/* Compare button overlay */}
+                  {!fullscreenPane && (
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={handleDualCompare}
+                      style={{
+                        position: "absolute",
+                        bottom: 12,
+                        right: 12,
+                        zIndex: 10,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        boxShadow: "var(--shadow-lg)",
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="2" y="3" width="8" height="18" rx="1" />
+                        <rect x="14" y="3" width="8" height="18" rx="1" />
+                      </svg>
+                      Compare
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Diff side panel */}
             {activePanel === "diff" && (

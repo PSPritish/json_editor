@@ -456,54 +456,247 @@ kbd {
   animation: spin 1s linear infinite;
 }
 
-/* --- vanilla-jsoneditor Warm Theme Overrides --- */
+/* ============================================================
+   vanilla-jsoneditor — LIGHT MODE overrides (warm theme)
+   ============================================================ */
+.jse-main,
+:root .jse-main {
+  /* Core */
+  --jse-theme-color: #D97706 !important;
+  --jse-theme-color-highlight: rgba(217, 119, 6, 0.10) !important;
+  --jse-background-color: var(--bg-primary) !important;
+  --jse-text-color: #292524 !important;
+  --jse-text-color-inverse: #FAFAF9 !important;
+
+  /* Panel (menu bar, status bar, modals) */
+  --jse-panel-background: var(--bg-secondary) !important;
+  --jse-panel-border: var(--border) !important;
+  --jse-panel-color: #44403C !important;
+  --jse-panel-color-readonly: #78716C !important;
+  --jse-panel-button-background: var(--bg-elevated) !important;
+  --jse-panel-button-background-highlight: var(--bg-hover) !important;
+  --jse-panel-button-color: #292524 !important;
+
+  /* Keys and values — high contrast for readability */
+  --jse-key-color: #92400E !important;
+  --jse-value-color: #9A3412 !important;
+  --jse-value-color-number: #3D6B0F !important;
+  --jse-value-color-boolean: #B45309 !important;
+  --jse-value-color-null: #78716C !important;
+  --jse-value-color-string: #7C2D12 !important;
+  --jse-value-color-url: #92400E !important;
+  --jse-delimiter-color: #78716C !important;
+  --jse-edit-outline: #F59E0B !important;
+
+  /* Selection */
+  --jse-selection-background-color: rgba(245, 158, 11, 0.18) !important;
+  --jse-selection-background-inactive-color: rgba(245, 158, 11, 0.08) !important;
+
+  /* Context menu */
+  --jse-context-menu-background: var(--bg-elevated) !important;
+  --jse-context-menu-background-highlight: var(--bg-hover) !important;
+  --jse-context-menu-color: #292524 !important;
+  --jse-context-menu-separator-color: var(--border) !important;
+  --jse-context-menu-pointer-background: var(--bg-hover) !important;
+  --jse-context-menu-pointer-color: #292524 !important;
+
+  /* Modal */
+  --jse-modal-background: var(--bg-elevated) !important;
+  --jse-modal-overlay-background: rgba(28, 25, 23, 0.3) !important;
+  --jse-modal-code-background: var(--bg-secondary) !important;
+
+  /* Tooltips */
+  --jse-tooltip-background: #44403C !important;
+  --jse-tooltip-color: #FAFAF9 !important;
+
+  /* Collapsed items indicator */
+  --jse-collapsed-items-background-color: var(--bg-tertiary) !important;
+  --jse-collapsed-items-selected-background-color: rgba(245, 158, 11, 0.15) !important;
+  --jse-collapsed-items-link-color: #B45309 !important;
+  --jse-collapsed-items-link-color-highlight: #92400E !important;
+
+  /* Indentation marker */
+  --jse-indent-marker-color: var(--border) !important;
+
+  /* Tag colors */
+  --jse-tag-background: var(--bg-tertiary) !important;
+  --jse-tag-color: #57534E !important;
+
+  /* Navigaiton bar */
+  --jse-navigation-bar-background: var(--bg-secondary) !important;
+  --jse-navigation-bar-background-highlight: var(--bg-hover) !important;
+  --jse-navigation-bar-color: #44403C !important;
+
+  /* Misc internals */
+  --jse-input-background: var(--bg-elevated) !important;
+  --jse-input-border: var(--border-strong) !important;
+  --jse-button-background: var(--bg-elevated) !important;
+  --jse-button-background-highlight: var(--bg-hover) !important;
+  --jse-button-color: #292524 !important;
+  --jse-button-primary-background: #D97706 !important;
+  --jse-button-primary-color: #FFFFFF !important;
+
+  /* Status bar */
+  --jse-main-border: var(--border) !important;
+
+  /* Error / warning */
+  --jse-error-color: var(--error) !important;
+  --jse-warning-color: var(--warning) !important;
+}
+
+/* ============================================================
+   vanilla-jsoneditor — DARK MODE overrides (warm theme)
+   ============================================================ */
 .jse-theme-dark,
 .dark .jse-main {
+  /* Core */
   --jse-theme-color: #FBBF24 !important;
   --jse-theme-color-highlight: rgba(251, 191, 36, 0.12) !important;
   --jse-background-color: #1C1917 !important;
-  --jse-text-color: #FAFAF9 !important;
+  --jse-text-color: #E7E5E4 !important;
   --jse-text-color-inverse: #1C1917 !important;
+
+  /* Panel */
   --jse-panel-background: #292524 !important;
   --jse-panel-border: #44403C !important;
   --jse-panel-color: #D6D3D1 !important;
+  --jse-panel-color-readonly: #78716C !important;
+  --jse-panel-button-background: #3D3530 !important;
+  --jse-panel-button-background-highlight: #57534E !important;
+  --jse-panel-button-color: #E7E5E4 !important;
+
+  /* Keys and values */
   --jse-key-color: #FBBF24 !important;
   --jse-value-color: #FB923C !important;
-  --jse-value-color-number: #84CC16 !important;
-  --jse-value-color-boolean: #F97316 !important;
+  --jse-value-color-number: #A3E635 !important;
+  --jse-value-color-boolean: #FDBA74 !important;
   --jse-value-color-null: #78716C !important;
   --jse-value-color-string: #FDE68A !important;
+  --jse-value-color-url: #FBBF24 !important;
   --jse-delimiter-color: #78716C !important;
-  --jse-selection-background-color: rgba(251, 191, 36, 0.15) !important;
+  --jse-edit-outline: #FBBF24 !important;
+
+  /* Selection */
+  --jse-selection-background-color: rgba(251, 191, 36, 0.18) !important;
   --jse-selection-background-inactive-color: rgba(251, 191, 36, 0.08) !important;
+
+  /* Context menu */
+  --jse-context-menu-background: #292524 !important;
+  --jse-context-menu-background-highlight: #44403C !important;
+  --jse-context-menu-color: #E7E5E4 !important;
+  --jse-context-menu-separator-color: #44403C !important;
+  --jse-context-menu-pointer-background: #44403C !important;
+  --jse-context-menu-pointer-color: #E7E5E4 !important;
+
+  /* Modal */
+  --jse-modal-background: #292524 !important;
+  --jse-modal-overlay-background: rgba(0, 0, 0, 0.5) !important;
+  --jse-modal-code-background: #1C1917 !important;
+
+  /* Tooltips */
+  --jse-tooltip-background: #57534E !important;
+  --jse-tooltip-color: #FAFAF9 !important;
+
+  /* Collapsed items */
+  --jse-collapsed-items-background-color: #3D3530 !important;
+  --jse-collapsed-items-selected-background-color: rgba(251, 191, 36, 0.15) !important;
+  --jse-collapsed-items-link-color: #FBBF24 !important;
+  --jse-collapsed-items-link-color-highlight: #FDE68A !important;
+
+  /* Indentation marker */
+  --jse-indent-marker-color: #44403C !important;
+
+  /* Tags */
+  --jse-tag-background: #44403C !important;
+  --jse-tag-color: #A8A29E !important;
+
+  /* Navigation bar */
+  --jse-navigation-bar-background: #292524 !important;
+  --jse-navigation-bar-background-highlight: #44403C !important;
+  --jse-navigation-bar-color: #D6D3D1 !important;
+
+  /* Inputs and buttons */
+  --jse-input-background: #1C1917 !important;
+  --jse-input-border: #57534E !important;
+  --jse-button-background: #3D3530 !important;
+  --jse-button-background-highlight: #57534E !important;
+  --jse-button-color: #E7E5E4 !important;
+  --jse-button-primary-background: #FBBF24 !important;
+  --jse-button-primary-color: #1C1917 !important;
+
+  /* Status bar */
+  --jse-main-border: #44403C !important;
+
+  /* Error / warning */
+  --jse-error-color: #EF4444 !important;
+  --jse-warning-color: #FB923C !important;
 }
 
-.jse-main,
-:root .jse-main {
-  --jse-theme-color: #F59E0B !important;
-  --jse-theme-color-highlight: rgba(245, 158, 11, 0.1) !important;
-  --jse-background-color: #FFFBF5 !important;
-  --jse-text-color: #1C1917 !important;
-  --jse-panel-background: #FFF7ED !important;
-  --jse-panel-border: #E7E5E4 !important;
-  --jse-key-color: #B45309 !important;
-  --jse-value-color: #C2410C !important;
-  --jse-value-color-number: #4D7C0F !important;
-  --jse-value-color-boolean: #EA580C !important;
-  --jse-value-color-null: #78716C !important;
-  --jse-value-color-string: #92400E !important;
-  --jse-delimiter-color: #A8A29E !important;
-  --jse-selection-background-color: rgba(245, 158, 11, 0.15) !important;
+/* Force dark mode on the CodeMirror editor inside vanilla-jsoneditor */
+.dark .jse-main .cm-editor,
+.jse-theme-dark .cm-editor {
+  background-color: #1C1917 !important;
+  color: #E7E5E4 !important;
+}
+
+.dark .jse-main .cm-editor .cm-gutters,
+.jse-theme-dark .cm-editor .cm-gutters {
+  background-color: #292524 !important;
+  color: #78716C !important;
+  border-right: 1px solid #44403C !important;
+}
+
+.dark .jse-main .cm-editor .cm-activeLineGutter,
+.jse-theme-dark .cm-editor .cm-activeLineGutter {
+  background-color: #3D3530 !important;
+}
+
+.dark .jse-main .cm-editor .cm-activeLine,
+.jse-theme-dark .cm-editor .cm-activeLine {
+  background-color: rgba(251, 191, 36, 0.06) !important;
+}
+
+.dark .jse-main .cm-editor .cm-cursor,
+.jse-theme-dark .cm-editor .cm-cursor {
+  border-left-color: #FBBF24 !important;
+}
+
+.dark .jse-main .cm-editor .cm-selectionBackground,
+.jse-theme-dark .cm-editor .cm-selectionBackground {
+  background-color: rgba(251, 191, 36, 0.18) !important;
+}
+
+/* Light mode CodeMirror contrast fix */
+:root .jse-main .cm-editor {
+  background-color: var(--bg-primary) !important;
+  color: #292524 !important;
+}
+
+:root .jse-main .cm-editor .cm-gutters {
+  background-color: var(--bg-secondary) !important;
+  color: #78716C !important;
+  border-right: 1px solid var(--border) !important;
+}
+
+:root .jse-main .cm-editor .cm-activeLine {
+  background-color: rgba(245, 158, 11, 0.06) !important;
+}
+
+:root .jse-main .cm-editor .cm-cursor {
+  border-left-color: #D97706 !important;
 }
 
 /* Ensure the editor fills its container */
 .jse-main {
-  min-height: 100%;
+  min-height: 100% !important;
+  height: 100% !important;
   border: none !important;
   border-radius: 0 !important;
 }
 
-/* --- App Layout Utility --- */
+/* ============================================================
+   App Layout
+   ============================================================ */
 .app-layout {
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr;
@@ -536,7 +729,9 @@ kbd {
   grid-row: 3;
 }
 
-/* --- Resizable panels --- */
+/* ============================================================
+   Resizable panels
+   ============================================================ */
 .split-horizontal {
   display: flex;
   flex-direction: column;
@@ -556,7 +751,125 @@ kbd {
   overflow: hidden;
 }
 
-/* --- Empty state illustration helper --- */
+/* ============================================================
+   Dual Pane — toolbar, label, mode switch
+   ============================================================ */
+.pane-toolbar {
+  padding: 4px 10px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 34px;
+  gap: 6px;
+}
+
+.pane-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.pane-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* Per-pane mode switcher pill */
+.mode-switch {
+  display: flex;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  background: var(--bg-elevated);
+}
+
+.mode-switch button {
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.mode-switch button:not(:last-child) {
+  border-right: 1px solid var(--border);
+}
+
+.mode-switch button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.mode-switch button.active {
+  background: var(--accent-subtle);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ============================================================
+   Pane Fullscreen
+   ============================================================ */
+.pane-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 100 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  background: var(--bg-primary) !important;
+}
+
+/* ============================================================
+   Drag-to-Resize Handle (vertical divider between panes)
+   ============================================================ */
+.pane-resizer {
+  flex: 0 0 5px;
+  background: var(--border);
+  cursor: col-resize;
+  position: relative;
+  transition: background var(--transition-fast);
+  z-index: 5;
+}
+
+.pane-resizer:hover,
+.pane-resizer.dragging {
+  background: var(--accent);
+}
+
+.pane-resizer::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 3px;
+  height: 32px;
+  border-radius: 2px;
+  background: var(--text-muted);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.pane-resizer:hover::after,
+.pane-resizer.dragging::after {
+  opacity: 0.6;
+  background: var(--accent-hover);
+}
+
+/* ============================================================
+   Misc
+   ============================================================ */
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -573,7 +886,6 @@ kbd {
   opacity: 0.5;
 }
 
-/* --- Mono font for code --- */
 .font-mono {
   font-family: 'GeistMono', 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
 }
@@ -630,25 +942,6 @@ input[type="range"]::-webkit-slider-thumb:hover {
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
-}
-
-/* --- Dual Pane toolbar --- */
-.pane-toolbar {
-  padding: 6px 12px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  min-height: 36px;
-}
-
-.pane-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-tertiary);
 }
 
 /* --- Slide-in for bottom panel --- */

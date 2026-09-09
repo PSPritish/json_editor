@@ -61,7 +61,7 @@ export default function StatusBar({
           }}
         />
         <span style={{ fontWeight: 500, color: "var(--text-muted)" }}>
-          © RiskJSON™ 2026
+          © Pritish Mahali 2026
         </span>
       </div>
     </footer>

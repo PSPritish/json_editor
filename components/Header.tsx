@@ -14,7 +14,7 @@ interface HeaderProps {
   onSaveAs: () => void;
   onLoadSchema: () => void;
   onFormat: () => void;
-  editorMode: "text" | "tree";
+  editorMode: "text" | "tree" | "table";
   onToggleMode: () => void;
 }
 
